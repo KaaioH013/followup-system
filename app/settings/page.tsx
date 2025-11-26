@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { SettingsForm } from "./settings-form";
+import { ImportForm } from "./import-form";
 
 export default async function SettingsPage() {
     const settings = await getSettings();
@@ -28,6 +29,19 @@ export default async function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <SettingsForm initialSettings={settings} />
+                </CardContent>
+            </Card>
+
+            <Card className="mt-6">
+                <CardHeader>
+                    <CardTitle>Importação de Dados</CardTitle>
+                    <CardDescription>
+                        Atualize o banco de dados enviando o arquivo CSV mais recente.
+                        Isso irá atualizar pedidos existentes e criar novos.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ImportForm />
                 </CardContent>
             </Card>
         </div>
