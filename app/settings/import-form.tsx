@@ -21,8 +21,9 @@ export function ImportForm() {
             } else {
                 toast.error(result.error)
             }
-        } catch (error) {
-            toast.error("Erro ao enviar arquivo")
+        } catch (error: any) {
+            console.error(error)
+            toast.error(`Erro ao enviar: ${error.message || "Erro desconhecido"}`)
         } finally {
             setIsUploading(false)
         }
