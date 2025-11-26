@@ -4,7 +4,7 @@ import { SignJWT } from 'jose'
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 
-export async function login(formData: FormData) {
+export async function login(prevState: any, formData: FormData) {
     const password = formData.get('password') as string
     const correctPassword = process.env.ACCESS_PASSWORD
 
