@@ -10,38 +10,61 @@ export async function importData(formData: FormData) {
             return { success: false, error: "Nenhum arquivo enviado" }
         }
 
-        const text = await file.text()
+        const buffer = await file.arrayBuffer()
+        const decoder = new TextDecoder('utf-8')
+        let text = decoder.decode(buffer)
 
-        // Parse CSV handling multiline quotes (Reuse logic from restore-data.ts)
-        const rawLines = text.split(/\r?\n|\r/)
-        const lines: string[] = []
-        let currentLine = ''
-
-        for (const rawLine of rawLines) {
-            if (currentLine) {
-                currentLine += '\n' + rawLine
-            } else {
-                currentLine = rawLine
+        // Helper to parse CSV lines handling quotes
+        const parseLines = (inputLines: string[]) => {
+            const parsed: string[] = []
+            let curr = ''
+            for (const rawLine of inputLines) {
+                if (curr) {
+                    curr += '\n' + rawLine
+                } else {
+                    curr = rawLine
+                }
+                const quotes = (curr.match(/"/g) || []).length
+                if (quotes % 2 === 0) {
+                    parsed.push(curr)
+                    curr = ''
+                }
             }
-
-            const quotes = (currentLine.match(/"/g) || []).length
-            if (quotes % 2 === 0) {
-                lines.push(currentLine)
-                currentLine = ''
-            }
+            return parsed
         }
 
+        let rawLines = text.split(/\r?\n|\r/)
+        let lines = parseLines(rawLines)
+
         // Find header
-        let headerLineIndex = -1
-        for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes('PV') && lines[i].includes('Cliente')) {
-                headerLineIndex = i
-                break
+        const findHeader = (ls: string[]) => {
+            for (let i = 0; i < ls.length; i++) {
+                if (ls[i].includes('PV') && ls[i].includes('Cliente')) {
+                    return i
+                }
             }
+            return -1
+        }
+
+        let headerLineIndex = findHeader(lines)
+
+        // If not found, try ISO-8859-1
+        if (headerLineIndex === -1) {
+            console.log("Header not found with UTF-8, trying ISO-8859-1")
+            const latin1Decoder = new TextDecoder('iso-8859-1')
+            text = latin1Decoder.decode(buffer)
+            rawLines = text.split(/\r?\n|\r/)
+            lines = parseLines(rawLines)
+            headerLineIndex = findHeader(lines)
         }
 
         if (headerLineIndex === -1) {
-            return { success: false, error: "Cabeçalho não encontrado no CSV (Procurando por 'PV' e 'Cliente')" }
+            const snippet = lines.slice(0, 5).join('\n')
+            console.error("CSV Header not found. First 5 lines:", snippet)
+            return {
+                success: false,
+                error: `Cabeçalho não encontrado no CSV (Procurando por 'PV' e 'Cliente'). Verifique se o arquivo está correto. Primeiras linhas lidas: \n${snippet}`
+            }
         }
 
         const header = lines[headerLineIndex].split(';')
