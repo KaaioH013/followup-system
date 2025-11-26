@@ -1,0 +1,434 @@
+import { prisma } from "@/lib/db";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { format, differenceInDays } from "date-fns";
+import Link from "next/link";
+import { ArrowLeft, Search, PlusCircle } from "lucide-react";
+import { redirect } from "next/navigation";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { createOrder } from "@/app/actions";
+
+export const dynamic = 'force-dynamic';
+
+export default async function OrdersPage({
+    searchParams,
+}: {
+    searchParams: Promise<{ q?: string; page?: string; status?: string; salesperson?: string }>;
+}) {
+    const params = await searchParams;
+    const query = params.q || "";
+    const status = params.status || "ALL";
+    const salesperson = params.salesperson || "ALL";
+    const page = Number(params.page) || 1;
+    const pageSize = 20;
+
+    const where: any = {};
+
+    if (query) {
+        where.OR = [
+            { pvCode: { contains: query } },
+            { clientName: { contains: query } },
+            { salesperson: { contains: query } },
+        ];
+    }
+
+    if (status !== "ALL") {
+        where.status = status;
+    }
+
+    if (salesperson !== "ALL") {
+        where.salesperson = salesperson;
+    }
+
+    const totalCount = await prisma.order.count({ where });
+    const totalPages = Math.ceil(totalCount / pageSize);
+
+    const orders = await prisma.order.findMany({
+        where,
+        take: pageSize,
+        skip: (page - 1) * pageSize,
+        orderBy: { orderDate: 'desc' },
+        include: {
+            requests: {
+                orderBy: { requestDate: 'asc' }
+            }
+        },
+    });
+
+    // Fetch unique salespeople for filter using groupBy
+    const salespeopleGroups = await prisma.order.groupBy({
+        by: ['salesperson'],
+        orderBy: { salesperson: 'asc' },
+    });
+
+    const salespeople = salespeopleGroups.map(g => g.salesperson);
+
+    async function searchAction(formData: FormData) {
+        "use server";
+        const q = formData.get("q");
+        const s = formData.get("status");
+        const sp = formData.get("salesperson");
+        redirect(`/orders?q=${q}&status=${s}&salesperson=${sp}`);
+    }
+
+    return (
+        <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
+            <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-6 shadow-sm">
+                <Button asChild variant="ghost" size="icon">
+                    <Link href="/">
+                        <ArrowLeft className="h-4 w-4" />
+                    </Link>
+                </Button>
+                <h1 className="font-semibold">Pedidos</h1>
+            </header>
+
+            <main className="flex-1 p-6 md:p-8">
+                <div className="flex items-center justify-between mb-6 gap-4">
+                    <form action={searchAction} className="flex w-full items-center space-x-2">
+                        <Input type="text" name="q" placeholder="Buscar PV, Cliente ou Vendedor..." defaultValue={query} className="max-w-sm" />
+
+                        <Select name="status" defaultValue={status}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">Todos os Status</SelectItem>
+                                <SelectItem value="PENDENTE">Pendentes</SelectItem>
+                                <SelectItem value="RESPONDIDO">Respondidos</SelectItem>
+                                <SelectItem value="ATRASADO">Atrasados</SelectItem>
+                                <SelectItem value="CONCLUIDO">Concluídos</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        <Select name="salesperson" defaultValue={salesperson}>
+                            <SelectTrigger className="w-[180px]">
+                                <SelectValue placeholder="Vendedor" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="ALL">Todos os Vendedores</SelectItem>
+                                {salespeople.map((sp) => (
+                                    <SelectItem key={sp} value={sp}>
+                                        {sp}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+
+                        <Button type="submit">
+                            <Search className="h-4 w-4" />
+                        </Button>
+                    </form>
+
+                    <Dialog>
+                        <DialogTrigger asChild>
+                            <Button className="gap-2">
+                                <PlusCircle className="h-4 w-4" />
+                                Novo Pedido
+                            </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                            <DialogHeader>
+                                <DialogTitle>Novo Pedido</DialogTitle>
+                            </DialogHeader>
+                            <form action={createOrder} className="space-y-4 mt-4">
+                                <div className="space-y-2">
+                                    <Label htmlFor="pv">Código PV</Label>
+                                    <Input id="pv" name="pvCode" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="client">Cliente</Label>
+                                    <Input id="client" name="clientName" required />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="salesperson">Vendedor</Label>
+                                    <Input id="salesperson" name="salesperson" />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label htmlFor="date">Data do Pedido</Label>
+                                    <Input id="date" name="orderDate" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                                </div>
+                                <Button type="submit" className="w-full">Criar Pedido</Button>
+                            </form>
+                        </DialogContent>
+                    </Dialog>
+                </div>
+
+                <div className="rounded-md border bg-white dark:bg-black">
+                    <Table>
+                        <TableHeader>
+                            <TableRow>
+                                <TableHead>PV</TableHead>
+                                <TableHead>Cliente</TableHead>
+                                <TableHead>Vendedor</TableHead>
+                                <TableHead>Data Pedido</TableHead>
+                                <TableHead>Status</TableHead>
+                                <TableHead>Previsão</TableHead>
+                                <TableHead>Tempo no Sistema</TableHead>
+                                <TableHead>Tempo Solicitação</TableHead>
+                                <TableHead>Solicitações</TableHead>
+                                <TableHead className="text-right">Ações</TableHead>
+                            </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                            {orders.map((order: any) => {
+                                const lastRequest = order.requests[order.requests.length - 1];
+                                return (
+                                    <TableRow key={order.id}>
+                                        <TableCell className="font-medium">{order.pvCode}</TableCell>
+                                        <TableCell>{order.clientName}</TableCell>
+                                        <TableCell>{order.salesperson}</TableCell>
+                                        <TableCell>{format(order.orderDate, 'dd/MM/yyyy')}</TableCell>
+                                        <TableCell>
+                                            import {prisma} from "@/lib/db";
+                                            import {Table, TableBody, TableCell, TableHead, TableHeader, TableRow} from "@/components/ui/table";
+                                            import {Badge} from "@/components/ui/badge";
+                                            import {Input} from "@/components/ui/input";
+                                            import {Button} from "@/components/ui/button";
+                                            import {format, differenceInDays} from "date-fns";
+                                            import Link from "next/link";
+                                            import {ArrowLeft, Search, PlusCircle} from "lucide-react";
+                                            import {redirect} from "next/navigation";
+                                            import {Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger} from "@/components/ui/dialog";
+                                            import {Label} from "@/components/ui/label";
+                                            import {Select, SelectContent, SelectItem, SelectTrigger, SelectValue} from "@/components/ui/select";
+                                            import {createOrder} from "@/app/actions";
+
+                                            export const dynamic = 'force-dynamic';
+
+                                            export default async function OrdersPage({
+                                                searchParams,
+}: {
+                                                searchParams: Promise<{ q ?: string; page?: string; status?: string; salesperson?: string }>;
+}) {
+    const params = await searchParams;
+                                            const query = params.q || "";
+                                            const status = params.status || "ALL";
+                                            const salesperson = params.salesperson || "ALL";
+                                            const page = Number(params.page) || 1;
+                                            const pageSize = 20;
+
+                                            const where: any = { };
+
+                                            if (query) {
+                                                where.OR = [
+                                                    { pvCode: { contains: query } },
+                                                    { clientName: { contains: query } },
+                                                    { salesperson: { contains: query } },
+                                                ];
+    }
+
+                                            if (status !== "ALL") {
+                                                where.status = status;
+    }
+
+                                            if (salesperson !== "ALL") {
+                                                where.salesperson = salesperson;
+    }
+
+                                            const totalCount = await prisma.order.count({where});
+                                            const totalPages = Math.ceil(totalCount / pageSize);
+
+                                            const orders = await prisma.order.findMany({
+                                                where,
+                                                take: pageSize,
+                                            skip: (page - 1) * pageSize,
+                                            orderBy: {orderDate: 'desc' },
+                                            include: {
+                                                requests: {
+                                                orderBy: {requestDate: 'asc' }
+            }
+        },
+    });
+
+                                            // Fetch unique salespeople for filter using groupBy
+                                            const salespeopleGroups = await prisma.order.groupBy({
+                                                by: ['salesperson'],
+                                            orderBy: {salesperson: 'asc' },
+    });
+
+    const salespeople = salespeopleGroups.map(g => g.salesperson);
+
+                                            async function searchAction(formData: FormData) {
+                                                "use server";
+                                            const q = formData.get("q");
+                                            const s = formData.get("status");
+                                            const sp = formData.get("salesperson");
+                                            redirect(`/orders?q=${q}&status=${s}&salesperson=${sp}`);
+    }
+
+                                            return (
+                                            <div className="flex min-h-screen flex-col bg-slate-50 dark:bg-slate-950">
+                                                <header className="sticky top-0 z-30 flex h-14 items-center gap-4 border-b bg-background px-6 shadow-sm">
+                                                    <Button asChild variant="ghost" size="icon">
+                                                        <Link href="/">
+                                                            <ArrowLeft className="h-4 w-4" />
+                                                        </Link>
+                                                    </Button>
+                                                    <h1 className="font-semibold">Pedidos</h1>
+                                                </header>
+
+                                                <main className="flex-1 p-6 md:p-8">
+                                                    <div className="flex items-center justify-between mb-6 gap-4">
+                                                        <form action={searchAction} className="flex w-full items-center space-x-2">
+                                                            <Input type="text" name="q" placeholder="Buscar PV, Cliente ou Vendedor..." defaultValue={query} className="max-w-sm" />
+
+                                                            <Select name="status" defaultValue={status}>
+                                                                <SelectTrigger className="w-[180px]">
+                                                                    <SelectValue placeholder="Status" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="ALL">Todos os Status</SelectItem>
+                                                                    <SelectItem value="PENDENTE">Pendentes</SelectItem>
+                                                                    <SelectItem value="RESPONDIDO">Respondidos</SelectItem>
+                                                                    <SelectItem value="ATRASADO">Atrasados</SelectItem>
+                                                                    <SelectItem value="CONCLUIDO">Concluídos</SelectItem>
+                                                                </SelectContent>
+                                                            </Select>
+
+                                                            <Select name="salesperson" defaultValue={salesperson}>
+                                                                <SelectTrigger className="w-[180px]">
+                                                                    <SelectValue placeholder="Vendedor" />
+                                                                </SelectTrigger>
+                                                                <SelectContent>
+                                                                    <SelectItem value="ALL">Todos os Vendedores</SelectItem>
+                                                                    {salespeople.map((sp) => (
+                                                                        <SelectItem key={sp} value={sp}>
+                                                                            {sp}
+                                                                        </SelectItem>
+                                                                    ))}
+                                                                </SelectContent>
+                                                            </Select>
+
+                                                            <Button type="submit">
+                                                                <Search className="h-4 w-4" />
+                                                            </Button>
+                                                        </form>
+
+                                                        <Dialog>
+                                                            <DialogTrigger asChild>
+                                                                <Button className="gap-2">
+                                                                    <PlusCircle className="h-4 w-4" />
+                                                                    Novo Pedido
+                                                                </Button>
+                                                            </DialogTrigger>
+                                                            <DialogContent>
+                                                                <DialogHeader>
+                                                                    <DialogTitle>Novo Pedido</DialogTitle>
+                                                                </DialogHeader>
+                                                                <form action={createOrder} className="space-y-4 mt-4">
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="pv">Código PV</Label>
+                                                                        <Input id="pv" name="pvCode" required />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="client">Cliente</Label>
+                                                                        <Input id="client" name="clientName" required />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="salesperson">Vendedor</Label>
+                                                                        <Input id="salesperson" name="salesperson" />
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        <Label htmlFor="date">Data do Pedido</Label>
+                                                                        <Input id="date" name="orderDate" type="date" defaultValue={new Date().toISOString().split('T')[0]} />
+                                                                    </div>
+                                                                    <Button type="submit" className="w-full">Criar Pedido</Button>
+                                                                </form>
+                                                            </DialogContent>
+                                                        </Dialog>
+                                                    </div>
+
+                                                    <div className="rounded-md border bg-white dark:bg-black">
+                                                        <Table>
+                                                            <TableHeader>
+                                                                <TableRow>
+                                                                    <TableHead>PV</TableHead>
+                                                                    <TableHead>Cliente</TableHead>
+                                                                    <TableHead>Vendedor</TableHead>
+                                                                    <TableHead>Data Pedido</TableHead>
+                                                                    <TableHead>Status</TableHead>
+                                                                    <TableHead>Previsão</TableHead>
+                                                                    <TableHead>Tempo no Sistema</TableHead>
+                                                                    <TableHead>Tempo Solicitação</TableHead>
+                                                                    <TableHead>Solicitações</TableHead>
+                                                                    <TableHead className="text-right">Ações</TableHead>
+                                                                </TableRow>
+                                                            </TableHeader>
+                                                            <TableBody>
+                                                                {orders.map((order: any) => {
+                                                                    const lastRequest = order.requests[order.requests.length - 1];
+                                                                    return (
+                                                                        <TableRow key={order.id}>
+                                                                            <TableCell className="font-medium">{order.pvCode}</TableCell>
+                                                                            <TableCell>{order.clientName}</TableCell>
+                                                                            <TableCell>{order.salesperson}</TableCell>
+                                                                            <TableCell>{format(order.orderDate, 'dd/MM/yyyy')}</TableCell>
+                                                                            <TableCell>
+                                                                                <Badge variant={order.status === 'PENDENTE' ? 'destructive' : order.status === 'RESPONDIDO' ? 'default' : 'secondary'}>
+                                                                                    {order.status}
+                                                                                </Badge>
+                                                                            </TableCell>
+                                                                            <TableCell>
+                                                                                {lastRequest?.forecastDate ? format(lastRequest.forecastDate, 'dd/MM/yyyy') : '-'}
+                                                                            </TableCell>
+                                                                            <TableCell>
+                                                                                {differenceInDays(new Date(), new Date(order.orderDate))} dias
+                                                                            </TableCell>
+                                                                            <TableCell>
+                                                                                {lastRequest ? (
+                                                                                    lastRequest.responseDate
+                                                                                        ? `${differenceInDays(new Date(lastRequest.responseDate), new Date(lastRequest.requestDate))} dias`
+                                                                                        : `${differenceInDays(new Date(), new Date(lastRequest.requestDate))} dias (pendente)`
+                                                                                ) : '-'}
+                                                                            </TableCell>
+                                                                            <TableCell>
+                                                                                {order.requests.length > 0 ? order.requests.length : '-'}
+                                                                            </TableCell>
+                                                                            <TableCell className="text-right">
+                                                                                <Button asChild variant="ghost" size="sm">
+                                                                                    <Link href={`/orders/${order.id}`}>Detalhes</Link>
+                                                                                </Button>
+                                                                            </TableCell>
+                                                                        </TableRow>
+                                                                    );
+                                                                })}
+                                                                {orders.length === 0 && (
+                                                                    <TableRow>
+                                                                        <TableCell colSpan={10} className="h-24 text-center">
+                                                                            Nenhum pedido encontrado.
+                                                                        </TableCell>
+                                                                    </TableRow>
+                                                                )}
+                                                            </TableBody>
+                                                        </Table>
+                                                    </div>
+
+                                                    <div className="mt-4 flex items-center justify-end gap-2">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={page <= 1}
+                                                            asChild={page > 1}
+                                                        >
+                                                            {page > 1 ? <Link href={`/orders?q=${query}&status=${status}&salesperson=${salesperson}&page=${page - 1}`}>Anterior</Link> : "Anterior"}
+                                                        </Button>
+                                                        <span className="text-sm text-muted-foreground">
+                                                            Página {page} de {totalPages || 1}
+                                                        </span>
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            disabled={page >= totalPages}
+                                                            asChild={page < totalPages}
+                                                        >
+                                                            {page < totalPages ? <Link href={`/orders?q=${query}&status=${status}&salesperson=${salesperson}&page=${page + 1}`}>Próxima</Link> : "Próxima"}
+                                                        </Button>
+                                                    </div>
+                                                </main>
+                                            </div>
+                                            );
+}

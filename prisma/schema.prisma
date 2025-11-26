@@ -1,0 +1,81 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(uuid())
+  name      String
+  email     String   @unique
+  role      String   // "VENDAS", "PCP", "ADMIN"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  requests  FollowUpRequest[] @relation("Requester")
+  comments  Comment[]
+}
+
+model Order {
+  id          String   @id @default(uuid())
+  pvCode      String   @unique // PV
+  clientName  String   // Cliente
+  salesperson String   // Vend.
+  orderDate   DateTime // Data Ped.
+  invoiced    Boolean  @default(false) // Faturado
+  invoicedDate DateTime? // Data do Faturamento
+  status      String   @default("PENDENTE") // PENDENTE, RESPONDIDO, ATRASADO, CONCLUIDO
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  requests    FollowUpRequest[]
+}
+
+model FollowUpRequest {
+  id            String    @id @default(uuid())
+  orderId       String
+  order         Order     @relation(fields: [orderId], references: [id])
+  
+  requesterId   String
+  requester     User      @relation("Requester", fields: [requesterId], references: [id])
+  
+  requestedDept String    // Solicitado (ex: PCP)
+  pcpEmail      String?    // Email do PCP para cobrança
+  pcpName       String?    // Nome do PCP
+  requestDate   DateTime  // Dt. Sol.
+  responseDate  DateTime? // Dt. Resp.
+  forecastDate  DateTime? // Previsão
+  notes         String?   // Observação inicial
+  responseCheck Boolean   @default(false) // Exp. (Conferido?)
+  
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  comments      Comment[]
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  requestId String
+  request   FollowUpRequest @relation(fields: [requestId], references: [id])
+  
+  authorId  String
+  author    User     @relation(fields: [authorId], references: [id])
+  
+  content   String
+  createdAt DateTime @default(now())
+}
+
+model Settings {
+  id        String   @id @default(uuid())
+  pcpEmail  String?
+  pcpName   String?
+  updatedAt DateTime @updatedAt
+}
