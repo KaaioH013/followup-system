@@ -26,9 +26,14 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen flex flex-col`}
       >
-        {children}
+        <div className="flex-1">
+          {children}
+        </div>
+        <footer className="py-4 text-center text-xs text-muted-foreground border-t bg-slate-50 dark:bg-slate-950">
+          <p>CS Analytics® - Sistema de Follow-up</p>
+        </footer>
         <Toaster richColors position="top-right" />
       </body>
     </html>
