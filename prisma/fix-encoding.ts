@@ -77,7 +77,7 @@ async function main() {
     for (const req of requests) {
         const fixedNotes = fixEncoding(req.notes);
         if (fixedNotes && fixedNotes !== req.notes) {
-            console.log(`Fixing Request Notes ${req.id}: ${req.notes.substring(0, 20)}... -> ${fixedNotes.substring(0, 20)}...`);
+            console.log(`Fixing Request Notes ${req.id}: ${req.notes?.substring(0, 20)}... -> ${fixedNotes.substring(0, 20)}...`);
             await prisma.followUpRequest.update({
                 where: { id: req.id },
                 data: { notes: fixedNotes },
