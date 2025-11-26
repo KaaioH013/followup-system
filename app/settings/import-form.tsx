@@ -12,6 +12,12 @@ export function ImportForm() {
     const [isUploading, setIsUploading] = useState(false)
 
     async function handleSubmit(formData: FormData) {
+        const file = formData.get('file') as File
+        if (file && file.size > 4 * 1024 * 1024) {
+            toast.error("Arquivo muito grande! O limite da Vercel é 4MB. Por favor, divida o arquivo.")
+            return
+        }
+
         setIsUploading(true)
         try {
             const result = await importData(formData)
