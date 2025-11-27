@@ -35,6 +35,7 @@ export default async function SettingsPage() {
                 </CardContent>
             </Card>
 
+            {/* 
             <Card className="mt-6">
                 <CardHeader>
                     <CardTitle>Importação de Dados</CardTitle>
@@ -59,6 +60,7 @@ export default async function SettingsPage() {
                     <ResetDbButton />
                 </CardContent>
             </Card>
+            */}
         </div>
     );
 }
