@@ -5,6 +5,7 @@ import { ArrowLeft } from "lucide-react";
 import Link from "next/link";
 import { SettingsForm } from "./settings-form";
 import { ImportForm } from "./import-form";
+import { ResetDbButton } from "./reset-db-button";
 
 export default async function SettingsPage() {
     const settings = await getSettings();
@@ -42,6 +43,18 @@ export default async function SettingsPage() {
                 </CardHeader>
                 <CardContent>
                     <ImportForm />
+                </CardContent>
+            </Card>
+
+            <Card className="mt-6 border-red-200">
+                <CardHeader>
+                    <CardTitle className="text-red-600">Zona de Perigo</CardTitle>
+                    <CardDescription>
+                        Ações destrutivas que não podem ser desfeitas.
+                    </CardDescription>
+                </CardHeader>
+                <CardContent>
+                    <ResetDbButton />
                 </CardContent>
             </Card>
         </div>
