@@ -186,7 +186,8 @@ export async function importData(formData: FormData) {
                 } else {
                     const nfe = cols[idx.nfe]?.trim()
                     const dtSaida = cols[idx.dtSaida]?.trim()
-                    if ((nfe && nfe !== '') || (dtSaida && dtSaida !== '')) {
+                    // Stricter check: must have content and not be "0" or "0,00"
+                    if ((nfe && nfe.length > 1 && nfe !== '0' && nfe !== '0,00') || (dtSaida && dtSaida.length > 5)) {
                         invoiced = true
                         invoicedDate = parseDate(cols[idx.dtNfe]) || parseDate(dtSaida) || new Date()
                     }
