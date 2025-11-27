@@ -3,7 +3,10 @@
 import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 
-export async function resetDatabase() {
+export async function resetDatabase(password: string) {
+    if (password !== process.env.ACCESS_PASSWORD) {
+        return { success: false, error: "Senha incorreta." }
+    }
     try {
         // Delete in order of dependency
         await prisma.followUpRequest.deleteMany({})
