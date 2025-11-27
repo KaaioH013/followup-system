@@ -4,7 +4,7 @@ import { prisma } from "@/lib/db"
 import { revalidatePath } from "next/cache"
 
 // Allow longer execution time (if supported by plan)
-export const maxDuration = 60;
+
 
 export async function importData(formData: FormData) {
     try {

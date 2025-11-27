@@ -7,6 +7,8 @@ import { SettingsForm } from "./settings-form";
 import { ImportForm } from "./import-form";
 import { ResetDbButton } from "./reset-db-button";
 
+export const maxDuration = 60;
+
 export default async function SettingsPage() {
     const settings = await getSettings();
 
